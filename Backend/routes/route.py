@@ -58,32 +58,47 @@ async def get_issues(current_user: auth.Annotated[dict, Depends(get_current_user
     issues = list_serial(collection_issues.find())
     return issues
 
-#Post Issue
-@router.post("/createIssue")
-async def post_issue(issue_Name: Issue):
-    collection_issues.insert_one(dict(issue_Name))
-    
+# Post Issue
+@router.post("/createIssue", status_code=status.HTTP_201_CREATED)
+async def post_issue(issue_Name: Issue, current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    result = collection_issues.insert_one(dict(issue_Name))
+    if not result.acknowledged:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create issue")
+    return {"message": "Issue created"}
 
-#patch Issue (update)
+# Patch Issue (update)
 @router.patch("/{id}")
-async def patch_issue(id: str, issue: IssueUpdate):
+async def patch_issue(id: str, issue: IssueUpdate, current_user: auth.Annotated[dict, Depends(get_current_user)]):
     update_data = issue.dict(exclude_unset=True)
-    collection_issues.find_one_and_update({"_id": ObjectId(id)}, {"$set": update_data})
+    updated_issue = collection_issues.find_one_and_update(
+        {"_id": ObjectId(id)}, 
+        {"$set": update_data},
+        return_document=True
+    )
+    if not updated_issue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    return {"message": "Issue updated"}
 
-#Delete Issue
+# Delete Issue
 @router.delete("/{id}")
-async def delete_issue(id: str):
-    collection_issues.delete_one({"_id": ObjectId(id)})
+async def delete_issue(id: str, current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    delete_result = collection_issues.delete_one({"_id": ObjectId(id)})
+    if delete_result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found or already deleted")
+    return {"message": "Issue deleted"}
 
-
-###AUTH###
-@router.post("/user")
+### AUTH ###
+@router.post("/user", status_code=status.HTTP_201_CREATED)
 async def create_user(create_user_request: auth.CreateUserRequest):
-    new_user= {
+    if collection_users.find_one({"username": create_user_request.username}):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+    
+    new_user = {
         "username": create_user_request.username,
         "hashed_pass": auth.bcrypt_context.hash(create_user_request.password)
     }
     collection_users.insert_one(new_user)
+    return {"message": "User created successfully"}
 
 @router.post("/token")
 async def login_for_token(form_data: auth.Annotated[auth.OAuth2PasswordRequestForm, auth.Depends()]):

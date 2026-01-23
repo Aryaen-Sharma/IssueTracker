@@ -1,6 +1,7 @@
 def individual_serial(issue)-> dict:
     return{
         "id": str(issue["_id"]),
+        "owner_id": str(issue["owner_id"]),
         "title": issue["title"],
         "description": issue["description"],
         "status": issue["status"],

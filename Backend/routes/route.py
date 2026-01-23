@@ -4,11 +4,13 @@ import auth
 from config.database import collection_issues, collection_users
 from schema.schemas import list_serial
 from bson import ObjectId
+from datetime import date
 
 router = APIRouter()
 
 
 
+### AUTH HELPERS ###
 def authenticate_user(username: str, password: str):
     user=collection_users.find_one({"username": username})
     if not user:
@@ -46,22 +48,20 @@ async def get_current_user(token: auth.Annotated[str, auth.Depends(auth.oauth2_b
 
 
 
-
-
-
-
 ###ISSUE HANDLING###
 
-#Get Issue
+#Get Issues
 @router.get("/")
 async def get_issues(current_user: auth.Annotated[dict, Depends(get_current_user)]):
-    issues = list_serial(collection_issues.find())
+    issues = list_serial(collection_issues.find({"owner_id": current_user["id"]}))
     return issues
 
 # Post Issue
 @router.post("/createIssue", status_code=status.HTTP_201_CREATED)
 async def post_issue(issue_Name: Issue, current_user: auth.Annotated[dict, Depends(get_current_user)]):
-    result = collection_issues.insert_one(dict(issue_Name))
+    payload=dict(issue_Name)
+    payload["owner_id"] = current_user["id"]
+    result = collection_issues.insert_one(payload)
     if not result.acknowledged:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create issue")
     return {"message": "Issue created"}
@@ -69,7 +69,7 @@ async def post_issue(issue_Name: Issue, current_user: auth.Annotated[dict, Depen
 # Patch Issue (update)
 @router.patch("/{id}")
 async def patch_issue(id: str, issue: IssueUpdate, current_user: auth.Annotated[dict, Depends(get_current_user)]):
-    update_data = issue.dict(exclude_unset=True)
+    update_data = issue.model_dump(exclude_unset=True)
     updated_issue = collection_issues.find_one_and_update(
         {"_id": ObjectId(id)}, 
         {"$set": update_data},
@@ -87,6 +87,8 @@ async def delete_issue(id: str, current_user: auth.Annotated[dict, Depends(get_c
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found or already deleted")
     return {"message": "Issue deleted"}
 
+
+
 ### AUTH ###
 @router.post("/user", status_code=status.HTTP_201_CREATED)
 async def create_user(create_user_request: auth.CreateUserRequest):
@@ -98,7 +100,9 @@ async def create_user(create_user_request: auth.CreateUserRequest):
         "hashed_pass": auth.bcrypt_context.hash(create_user_request.password)
     }
     collection_users.insert_one(new_user)
-    return {"message": "User created successfully"}
+    return {"message": "User created successfully"            }
+
+
 
 @router.post("/token")
 async def login_for_token(form_data: auth.Annotated[auth.OAuth2PasswordRequestForm, auth.Depends()]):
@@ -107,4 +111,4 @@ async def login_for_token(form_data: auth.Annotated[auth.OAuth2PasswordRequestFo
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
     token= create_access_token(user["username"], str(user.get("_id")), auth.timedelta(minutes=20))
-    return {'access_token': token, 'token_type': 'bearer'}
+    return {'access_token': token, 'token_type': 'bearer', 'user_id': str(user.get("_id"))}

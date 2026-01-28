@@ -4,7 +4,7 @@ A full-stack issue tracking application designed for personal task management. T
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 * **Frontend:** React (Vite), Bootstrap 5, Axios
 * **Backend:** FastAPI, Pydantic, Jose (JWT), Passlib (Bcrypt)
@@ -14,7 +14,7 @@ A full-stack issue tracking application designed for personal task management. T
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites
 * Python 3.10+
@@ -59,7 +59,7 @@ A full-stack issue tracking application designed for personal task management. T
 
 ---
 
-## 🔑 Key Features
+## Key Features
 
 * **JWT Authentication:** Secure login flow using OAuth2 Bearer tokens.
 * **Data Integrity:** Pydantic models ensure all issues have a title, description, and status before saving.
@@ -70,7 +70,7 @@ A full-stack issue tracking application designed for personal task management. T
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 IssueTracker/

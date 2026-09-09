@@ -90,6 +90,8 @@ Every issue stores an `owner_id`, and all queries are scoped to the requesting u
 
 Some seeded issues represent sensitive work — rotating production credentials, setting up backups, auditing permissions. Those are marked `is_protected` and can only be deleted by an admin:
 
+![Protected issue](docs/protected-issue.png)
+
 ```python
 if issue.get("is_protected") and not current_user.get("is_admin"):
     raise HTTPException(

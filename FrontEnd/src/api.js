@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+// In production, set VITE_API_URL to your deployed backend's URL.
+// Falls back to localhost for local development.
 const api = axios.create({
-    baseURL: 'http://localhost:8000'
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000'
 });
 
 // Automatically attach the JWT (if we have one) to every request.

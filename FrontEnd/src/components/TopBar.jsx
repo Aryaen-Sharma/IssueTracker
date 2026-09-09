@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api'
+import GitHubLink from './GitHubLink'
 import { useAuth } from '../context/useAuth'
 import { useTheme } from '../context/useTheme'
 import { useToast } from '../context/useToast'
@@ -49,6 +50,7 @@ const TopBar = () => {
         <button className="btn btn-outline btn-sm" onClick={logout}>
           Logout
         </button>
+        <GitHubLink variant="icon" />
       </div>
     </header>
   )

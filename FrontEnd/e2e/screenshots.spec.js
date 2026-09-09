@@ -13,6 +13,9 @@ test.describe('README screenshots', () => {
     const username = 'shot_' + Math.random().toString(36).slice(2, 8)
 
     await page.goto('/login')
+    await page.waitForTimeout(300)
+    await page.screenshot({ path: shot('login.png'), fullPage: false })
+
     await page.getByRole('button', { name: /don't have an account/i }).click()
     await page.locator('#username').fill(username)
     await page.locator('#password').fill(password)

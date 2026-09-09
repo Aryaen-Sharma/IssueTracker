@@ -1,4 +1,44 @@
 
+/* ---------- GitHub link ---------- */
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.github-link:hover {
+  color: var(--text);
+}
+
+.github-link-icon {
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background-color: transparent;
+}
+
+.github-link-icon:hover {
+  border-color: var(--accent);
+  background-color: var(--surface-alt);
+  color: var(--accent);
+}
+
+.auth-footer {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+}
+
 /* ---------- Stats page ---------- */
 
 .stats-summary {

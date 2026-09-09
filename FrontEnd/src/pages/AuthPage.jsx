@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import GitHubLink from '../components/GitHubLink'
 import { useAuth } from '../context/useAuth'
 import { useToast } from '../context/useToast'
 
@@ -87,6 +88,10 @@ const AuthPage = () => {
           >
             {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
           </button>
+        </div>
+
+        <div className="auth-footer">
+          <GitHubLink />
         </div>
       </div>
     </div>

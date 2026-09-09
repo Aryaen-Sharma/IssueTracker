@@ -6,6 +6,8 @@ def individual_serial(issue) -> dict:
         "description": issue["description"],
         "status": issue["status"],
         "priority": issue.get("priority", "Medium"),
+        "labels": issue.get("labels", []),
+        "due_date": issue.get("due_date"),
         "created_at": issue["created_at"],
         "updated_at": issue["updated_at"],
         "comments": issue.get("comments", []),

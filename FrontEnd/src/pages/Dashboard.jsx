@@ -6,30 +6,45 @@ import { useToast } from '../context/useToast'
 
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Closed']
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High']
+const PAGE_SIZE = 6
 
 const statusClass = (status) => `badge-${status.toLowerCase().replace(/\s+/g, '-')}`
 const priorityClass = (priority) => `priority-${priority.toLowerCase()}`
+const isOverdue = (issue) => issue.due_date && issue.status !== 'Closed' && issue.due_date < new Date().toISOString().slice(0, 10)
 
 const Dashboard = () => {
   const { showToast } = useToast()
 
   const [issues, setIssues] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
   const [loadingIssues, setLoadingIssues] = useState(false)
 
-  const [formData, setFormData] = useState({ title: '', description: '', status: 'Open', priority: 'Medium' })
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'Open',
+    priority: 'Medium',
+    due_date: '',
+    labels: '',
+  })
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   // Search / filter / sort controls
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [labelFilter, setLabelFilter] = useState('All')
   const [sortBy, setSortBy] = useState('newest')
 
-  const fetchIssues = async () => {
+  const fetchIssues = async (targetPage = page) => {
     setLoadingIssues(true)
     try {
-      const response = await api.get('/auth/')
-      setIssues(response.data)
+      const response = await api.get('/auth/', {
+        params: { skip: targetPage * PAGE_SIZE, limit: PAGE_SIZE },
+      })
+      setIssues(response.data.items)
+      setTotal(response.data.total)
     } catch (error) {
       console.error('Error fetching issues:', error.response?.data || error.message)
     } finally {
@@ -38,8 +53,9 @@ const Dashboard = () => {
   }
 
   useEffect(() => {
-    fetchIssues()
-  }, [])
+    fetchIssues(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
 
   const handleInputChange = (event) => {
     setFormData({ ...formData, [event.target.name]: event.target.value })
@@ -50,11 +66,21 @@ const Dashboard = () => {
     setFormError('')
     setSubmitting(true)
 
+    const payload = {
+      ...formData,
+      due_date: formData.due_date || null,
+      labels: formData.labels
+        .split(',')
+        .map((label) => label.trim())
+        .filter(Boolean),
+    }
+
     try {
-      await api.post('/auth/createIssue', formData)
-      setFormData({ title: '', description: '', status: 'Open', priority: 'Medium' })
+      await api.post('/auth/createIssue', payload)
+      setFormData({ title: '', description: '', status: 'Open', priority: 'Medium', due_date: '', labels: '' })
       showToast('Issue created', 'success')
-      await fetchIssues()
+      setPage(0)
+      await fetchIssues(0)
     } catch (error) {
       console.error('Error creating issue:', error.response?.data || error.message)
       setFormError('Could not create the issue. Please check the fields and try again.')
@@ -63,12 +89,17 @@ const Dashboard = () => {
     }
   }
 
+  // Optimistic update: flip the status in the UI immediately, then confirm
+  // with the server. If the request fails, roll back to the previous value.
   const handleStatusChange = async (id, newStatus) => {
+    const previous = issues
+    setIssues((prev) => prev.map((issue) => (issue.id === id ? { ...issue, status: newStatus } : issue)))
+
     try {
       await api.patch(`/auth/${id}`, { status: newStatus })
-      await fetchIssues()
     } catch (error) {
       console.error('Error updating status:', error.response?.data || error.message)
+      setIssues(previous)
       showToast('Could not update status', 'error')
     }
   }
@@ -77,19 +108,29 @@ const Dashboard = () => {
     if (!window.confirm('Delete this issue? This cannot be undone.')) return
     try {
       await api.delete(`/auth/${id}`)
-      setIssues((prev) => prev.filter((issue) => issue.id !== id))
       showToast('Issue deleted', 'success')
+      await fetchIssues(page)
     } catch (error) {
       console.error('Error deleting issue:', error.response?.data || error.message)
       showToast('Could not delete issue', 'error')
     }
   }
 
+  const allLabels = useMemo(() => {
+    const labelSet = new Set()
+    issues.forEach((issue) => (issue.labels || []).forEach((label) => labelSet.add(label)))
+    return Array.from(labelSet).sort()
+  }, [issues])
+
   const visibleIssues = useMemo(() => {
     let result = issues
 
     if (statusFilter !== 'All') {
       result = result.filter((issue) => issue.status === statusFilter)
+    }
+
+    if (labelFilter !== 'All') {
+      result = result.filter((issue) => (issue.labels || []).includes(labelFilter))
     }
 
     if (searchTerm.trim()) {
@@ -106,11 +147,14 @@ const Dashboard = () => {
       if (sortBy === 'newest') return (b.created_at || '').localeCompare(a.created_at || '')
       if (sortBy === 'oldest') return (a.created_at || '').localeCompare(b.created_at || '')
       if (sortBy === 'priority') return (priorityRank[b.priority] || 0) - (priorityRank[a.priority] || 0)
+      if (sortBy === 'due_date') return (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99')
       return 0
     })
 
     return result
-  }, [issues, searchTerm, statusFilter, sortBy])
+  }, [issues, searchTerm, statusFilter, labelFilter, sortBy])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <div className="page">
@@ -167,6 +211,31 @@ const Dashboard = () => {
               </select>
             </div>
 
+            <div className="field field-status">
+              <label htmlFor="due_date">Due date</label>
+              <input
+                id="due_date"
+                type="date"
+                className="input"
+                name="due_date"
+                value={formData.due_date}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="field field-desc">
+              <label htmlFor="labels">Labels</label>
+              <input
+                id="labels"
+                type="text"
+                className="input"
+                placeholder="bug, backend (comma separated)"
+                name="labels"
+                value={formData.labels}
+                onChange={handleInputChange}
+              />
+            </div>
+
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? 'Adding…' : 'Add Issue'}
             </button>
@@ -191,16 +260,24 @@ const Dashboard = () => {
             ))}
           </select>
 
+          <select className="input" value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)}>
+            <option value="All">All labels</option>
+            {allLabels.map((label) => (
+              <option key={label} value={label}>{label}</option>
+            ))}
+          </select>
+
           <select className="input" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="priority">By priority</option>
+            <option value="due_date">By due date</option>
           </select>
         </section>
 
         <div className="list-header">
           <h2>Issues ({visibleIssues.length})</h2>
-          <button className="btn btn-outline btn-sm" onClick={fetchIssues} disabled={loadingIssues}>
+          <button className="btn btn-outline btn-sm" onClick={() => fetchIssues(page)} disabled={loadingIssues}>
             {loadingIssues ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
@@ -222,9 +299,19 @@ const Dashboard = () => {
                     <p className="issue-title">{issue.title}</p>
                   </Link>
                   <p className="issue-desc">{issue.description || 'No description'}</p>
-                  <span className={`priority-tag ${priorityClass(issue.priority || 'Medium')}`}>
-                    {issue.priority || 'Medium'} priority
-                  </span>
+                  <div className="issue-tags">
+                    <span className={`priority-tag ${priorityClass(issue.priority || 'Medium')}`}>
+                      {issue.priority || 'Medium'} priority
+                    </span>
+                    {issue.due_date && (
+                      <span className={`due-tag ${isOverdue(issue) ? 'due-overdue' : ''}`}>
+                        {isOverdue(issue) ? 'Overdue: ' : 'Due '}{issue.due_date}
+                      </span>
+                    )}
+                    {(issue.labels || []).map((label) => (
+                      <span className="label-tag" key={label}>{label}</span>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="issue-side">
@@ -249,6 +336,28 @@ const Dashboard = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {total > PAGE_SIZE && (
+          <div className="pagination">
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || loadingIssues}
+            >
+              ← Previous
+            </button>
+            <span className="hint" style={{ margin: 0 }}>
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page + 1 >= totalPages || loadingIssues}
+            >
+              Next →
+            </button>
           </div>
         )}
       </div>

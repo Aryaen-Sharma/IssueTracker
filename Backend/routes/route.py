@@ -59,9 +59,45 @@ def _parse_object_id(id: str) -> ObjectId:
 
 #Get Issues
 @router.get("/")
-async def get_issues(current_user: auth.Annotated[dict, Depends(get_current_user)]):
-    issues = list_serial(collection_issues.find({"owner_id": current_user["id"]}))
-    return issues
+async def get_issues(
+    current_user: auth.Annotated[dict, Depends(get_current_user)],
+    skip: int = 0,
+    limit: int = 20,
+):
+    query = {"owner_id": current_user["id"]}
+    total = collection_issues.count_documents(query)
+    cursor = collection_issues.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    return {
+        "items": list_serial(cursor),
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+# Get issue stats (counts by status/priority) for the dashboard chart
+@router.get("/stats")
+async def get_stats(current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    pipeline = [
+        {"$match": {"owner_id": current_user["id"]}},
+        {
+            "$group": {
+                "_id": None,
+                "total": {"$sum": 1},
+                "open": {"$sum": {"$cond": [{"$eq": ["$status", "Open"]}, 1, 0]}},
+                "in_progress": {"$sum": {"$cond": [{"$eq": ["$status", "In Progress"]}, 1, 0]}},
+                "closed": {"$sum": {"$cond": [{"$eq": ["$status", "Closed"]}, 1, 0]}},
+                "high": {"$sum": {"$cond": [{"$eq": ["$priority", "High"]}, 1, 0]}},
+                "medium": {"$sum": {"$cond": [{"$eq": ["$priority", "Medium"]}, 1, 0]}},
+                "low": {"$sum": {"$cond": [{"$eq": ["$priority", "Low"]}, 1, 0]}},
+            }
+        },
+    ]
+    result = list(collection_issues.aggregate(pipeline))
+    if not result:
+        return {"total": 0, "open": 0, "in_progress": 0, "closed": 0, "high": 0, "medium": 0, "low": 0}
+    stats = result[0]
+    stats.pop("_id", None)
+    return stats
 
 # Get single issue
 @router.get("/{id}")
@@ -151,7 +187,6 @@ async def create_user(create_user_request: auth.CreateUserRequest):
 @router.post("/token")
 async def login_for_token(form_data: auth.Annotated[auth.OAuth2PasswordRequestForm, auth.Depends()]):
     user = authenticate_user(form_data.username, form_data.password)
-    print(user)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
     token= create_access_token(user["username"], str(user.get("_id")), auth.timedelta(minutes=20))

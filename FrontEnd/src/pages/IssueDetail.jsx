@@ -8,6 +8,7 @@ const STATUS_OPTIONS = ['Open', 'In Progress', 'Closed']
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High']
 
 const statusClass = (status) => `badge-${status.toLowerCase().replace(/\s+/g, '-')}`
+const isOverdue = (issue) => issue.due_date && issue.status !== 'Closed' && issue.due_date < new Date().toISOString().slice(0, 10)
 
 const IssueDetail = () => {
   const { id } = useParams()
@@ -19,7 +20,14 @@ const IssueDetail = () => {
   const [notFound, setNotFound] = useState(false)
 
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState({ title: '', description: '', status: 'Open', priority: 'Medium' })
+  const [editData, setEditData] = useState({
+    title: '',
+    description: '',
+    status: 'Open',
+    priority: 'Medium',
+    due_date: '',
+    labels: '',
+  })
 
   const [commentBody, setCommentBody] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -50,6 +58,8 @@ const IssueDetail = () => {
       description: issue.description,
       status: issue.status,
       priority: issue.priority || 'Medium',
+      due_date: issue.due_date || '',
+      labels: (issue.labels || []).join(', '),
     })
     setIsEditing(true)
   }
@@ -60,8 +70,16 @@ const IssueDetail = () => {
 
   const saveEdit = async (event) => {
     event.preventDefault()
+    const payload = {
+      ...editData,
+      due_date: editData.due_date || null,
+      labels: editData.labels
+        .split(',')
+        .map((label) => label.trim())
+        .filter(Boolean),
+    }
     try {
-      await api.patch(`/auth/${id}`, editData)
+      await api.patch(`/auth/${id}`, payload)
       setIsEditing(false)
       showToast('Issue updated', 'success')
       await fetchIssue()
@@ -153,6 +171,21 @@ const IssueDetail = () => {
                   ))}
                 </select>
               </div>
+              <div className="field">
+                <label htmlFor="due_date">Due date</label>
+                <input id="due_date" type="date" className="input" name="due_date" value={editData.due_date} onChange={handleEditChange} />
+              </div>
+              <div className="field">
+                <label htmlFor="labels">Labels</label>
+                <input
+                  id="labels"
+                  className="input"
+                  name="labels"
+                  placeholder="bug, backend (comma separated)"
+                  value={editData.labels}
+                  onChange={handleEditChange}
+                />
+              </div>
               <div className="issue-actions" style={{ marginTop: '1rem' }}>
                 <button type="submit" className="btn btn-primary">Save</button>
                 <button type="button" className="btn btn-outline" onClick={() => setIsEditing(false)}>Cancel</button>
@@ -168,6 +201,18 @@ const IssueDetail = () => {
                 <span className={`priority-tag priority-${(issue.priority || 'Medium').toLowerCase()}`} style={{ marginLeft: '0.5rem' }}>
                   {issue.priority || 'Medium'} priority
                 </span>
+                {issue.due_date && (
+                  <span className={`due-tag ${isOverdue(issue) ? 'due-overdue' : ''}`} style={{ marginLeft: '0.5rem' }}>
+                    {isOverdue(issue) ? 'Overdue: ' : 'Due '}{issue.due_date}
+                  </span>
+                )}
+                {(issue.labels || []).length > 0 && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {issue.labels.map((label) => (
+                      <span className="label-tag" key={label}>{label}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="issue-actions">
                 <button className="btn btn-outline btn-sm" onClick={startEditing}>Edit</button>

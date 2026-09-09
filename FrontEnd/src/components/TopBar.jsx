@@ -13,6 +13,9 @@ const TopBar = () => {
         <h1>Issue Tracker</h1>
       </Link>
       <div className="topbar-actions">
+        <Link to="/stats" className="btn btn-outline btn-sm">
+          Stats
+        </Link>
         <button className="btn btn-outline btn-sm" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
         </button>

@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import IssueDetail from './pages/IssueDetail'
+import Stats from './pages/Stats'
 
 const App = () => {
   return (
@@ -29,6 +30,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <IssueDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/stats"
+                element={
+                  <ProtectedRoute>
+                    <Stats />
                   </ProtectedRoute>
                 }
               />

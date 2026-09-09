@@ -2,11 +2,11 @@
 
 A full-stack issue tracker built with **React** and **FastAPI**, backed by **MongoDB Atlas** and deployed on **Vercel**. Users sign up, manage their own issues, comment on them, and view stats — with a role-based permission rule that stops non-admins from deleting sensitive issues.
 
-> **Live demo:** _add your Vercel URL here_
+> **Live demo:** https://issue-tracker-sharm4.vercel.app
 
 ![Demo walkthrough](docs/demo.gif)
 
-*(Higher quality version: [`docs/demo.mp4`](docs/demo.mp4). The clip above is generated automatically by the Playwright e2e suite — see [Tests](#tests).)*
+▶ **[Watch the full demo (MP4)](docs/demo.mp4)**
 
 ---
 
@@ -165,8 +165,6 @@ cd FrontEnd
 npm run test:e2e            # run the suite
 npm run test:e2e:report     # open the HTML report
 ```
-
-The demo recording at the top of this README is the video artifact from the `walkthrough for the demo recording` test, so it can't drift out of date without the test failing first.
 
 ---
 

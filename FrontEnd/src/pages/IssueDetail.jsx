@@ -29,6 +29,7 @@ const IssueDetail = () => {
     priority: 'Medium',
     due_date: '',
     labels: '',
+    assignee: '',
   })
 
   const [commentBody, setCommentBody] = useState('')
@@ -62,6 +63,7 @@ const IssueDetail = () => {
       priority: issue.priority || 'Medium',
       due_date: issue.due_date || '',
       labels: (issue.labels || []).join(', '),
+      assignee: issue.assignee || '',
     })
     setIsEditing(true)
   }
@@ -75,6 +77,7 @@ const IssueDetail = () => {
     const payload = {
       ...editData,
       due_date: editData.due_date || null,
+      assignee: editData.assignee.trim() || null,
       labels: editData.labels
         .split(',')
         .map((label) => label.trim())
@@ -182,6 +185,17 @@ const IssueDetail = () => {
                 <input id="due_date" type="date" className="input" name="due_date" value={editData.due_date} onChange={handleEditChange} />
               </div>
               <div className="field">
+                <label htmlFor="assignee">Assignee</label>
+                <input
+                  id="assignee"
+                  className="input"
+                  name="assignee"
+                  placeholder="Unassigned"
+                  value={editData.assignee}
+                  onChange={handleEditChange}
+                />
+              </div>
+              <div className="field">
                 <label htmlFor="labels">Labels</label>
                 <input
                   id="labels"
@@ -216,6 +230,9 @@ const IssueDetail = () => {
                   <span className={`due-tag ${isOverdue(issue) ? 'due-overdue' : ''}`} style={{ marginLeft: '0.5rem' }}>
                     {isOverdue(issue) ? 'Overdue: ' : 'Due '}{issue.due_date}
                   </span>
+                )}
+                {issue.assignee && (
+                  <span className="assignee-tag" style={{ marginLeft: '0.5rem' }}>👤 {issue.assignee}</span>
                 )}
                 {(issue.labels || []).length > 0 && (
                   <div style={{ marginTop: '0.5rem' }}>

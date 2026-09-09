@@ -12,6 +12,7 @@ class Issue(BaseModel):
     priority: str = "Medium"
     labels: list[str] = []
     due_date: str | None = None
+    assignee: str | None = None
     is_protected: bool = False
     # These are set by the server, not the client.
     owner_id: str | None = None
@@ -29,6 +30,7 @@ class IssueUpdate(BaseModel):
     priority: str | None = None
     labels: list[str] | None = None
     due_date: str | None = None
+    assignee: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 

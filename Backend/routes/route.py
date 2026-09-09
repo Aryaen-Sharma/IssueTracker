@@ -341,3 +341,25 @@ async def toggle_admin_demo(current_user: auth.Annotated[dict, Depends(get_curre
 
     token = create_access_token(user["username"], str(user["_id"]), new_is_admin, auth.timedelta(minutes=20))
     return {"access_token": token, "token_type": "bearer", "is_admin": new_is_admin}
+
+
+# Change password: requires the current password so a hijacked/left-open
+# session can't be used to lock the real owner out of their own account.
+@router.patch("/me/password")
+async def change_password(
+    payload: auth.ChangePasswordRequest,
+    current_user: auth.Annotated[dict, Depends(get_current_user)],
+):
+    user = collection_users.find_one({"_id": ObjectId(current_user["id"])})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not auth.bcrypt_context.verify(payload.current_password, user["hashed_pass"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+
+    if len(payload.new_password) < 4:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be at least 4 characters")
+
+    new_hash = auth.bcrypt_context.hash(payload.new_password)
+    collection_users.update_one({"_id": user["_id"]}, {"$set": {"hashed_pass": new_hash}})
+    return {"message": "Password updated successfully"}

@@ -40,6 +40,9 @@ const TopBar = () => {
         <Link to="/stats" className="btn btn-outline btn-sm">
           Stats
         </Link>
+        <Link to="/settings" className="btn btn-outline btn-sm">
+          Settings
+        </Link>
         <button className="btn btn-outline btn-sm" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
         </button>

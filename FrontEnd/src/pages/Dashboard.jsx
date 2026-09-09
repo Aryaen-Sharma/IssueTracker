@@ -29,6 +29,7 @@ const Dashboard = () => {
     priority: 'Medium',
     due_date: '',
     labels: '',
+    assignee: '',
   })
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -71,6 +72,7 @@ const Dashboard = () => {
     const payload = {
       ...formData,
       due_date: formData.due_date || null,
+      assignee: formData.assignee.trim() || null,
       labels: formData.labels
         .split(',')
         .map((label) => label.trim())
@@ -79,7 +81,7 @@ const Dashboard = () => {
 
     try {
       await api.post('/auth/createIssue', payload)
-      setFormData({ title: '', description: '', status: 'Open', priority: 'Medium', due_date: '', labels: '' })
+      setFormData({ title: '', description: '', status: 'Open', priority: 'Medium', due_date: '', labels: '', assignee: '' })
       showToast('Issue created', 'success')
       setPage(0)
       await fetchIssues(0)
@@ -229,6 +231,19 @@ const Dashboard = () => {
               />
             </div>
 
+            <div className="field field-status">
+              <label htmlFor="assignee">Assignee</label>
+              <input
+                id="assignee"
+                type="text"
+                className="input"
+                placeholder="Unassigned"
+                name="assignee"
+                value={formData.assignee}
+                onChange={handleInputChange}
+              />
+            </div>
+
             <div className="field field-desc">
               <label htmlFor="labels">Labels</label>
               <input
@@ -311,6 +326,7 @@ const Dashboard = () => {
                   </Link>
                   <p className="issue-desc">{issue.description || 'No description'}</p>
                   <div className="issue-tags">
+                    {issue.assignee && <span className="assignee-tag">👤 {issue.assignee}</span>}
                     <span className={`priority-tag ${priorityClass(issue.priority || 'Medium')}`}>
                       {issue.priority || 'Medium'} priority
                     </span>

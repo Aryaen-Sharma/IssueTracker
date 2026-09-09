@@ -8,6 +8,8 @@ import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import IssueDetail from './pages/IssueDetail'
 import Stats from './pages/Stats'
+import Settings from './pages/Settings'
+import NotFound from './pages/NotFound'
 
 const App = () => {
   return (
@@ -41,6 +43,15 @@ const App = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </AuthProvider>

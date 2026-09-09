@@ -299,14 +299,18 @@ const Dashboard = () => {
         ) : (
           <div className="issue-list">
             {visibleIssues.map((issue) => (
-              <div className="issue-card" key={issue.id}>
+              <div className={`issue-card ${issue.is_protected ? 'issue-card-protected' : ''}`} key={issue.id}>
                 <div className="issue-main">
+                  {issue.is_protected && (
+                    <div style={{ marginBottom: '0.4rem' }}>
+                      <span className="protected-tag">🔒 Admin Only</span>
+                    </div>
+                  )}
                   <Link to={`/issues/${issue.id}`} className="issue-title-link">
                     <p className="issue-title">{issue.title}</p>
                   </Link>
                   <p className="issue-desc">{issue.description || 'No description'}</p>
                   <div className="issue-tags">
-                    {issue.is_protected && <span className="protected-tag">🔒 Protected</span>}
                     <span className={`priority-tag ${priorityClass(issue.priority || 'Medium')}`}>
                       {issue.priority || 'Medium'} priority
                     </span>

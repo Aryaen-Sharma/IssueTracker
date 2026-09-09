@@ -199,12 +199,16 @@ const IssueDetail = () => {
             </form>
           </section>
         ) : (
-          <section className="panel">
+          <section className={`panel ${issue.is_protected ? 'issue-card-protected' : ''}`}>
             <div className="detail-header">
               <div>
+                {issue.is_protected && (
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <span className="protected-tag">🔒 Admin Only</span>
+                  </div>
+                )}
                 <h2 style={{ marginBottom: '0.35rem' }}>{issue.title}</h2>
                 <span className={`badge-select-static ${statusClass(issue.status)}`}>{issue.status}</span>
-                {issue.is_protected && <span className="protected-tag" style={{ marginLeft: '0.5rem' }}>🔒 Protected</span>}
                 <span className={`priority-tag priority-${(issue.priority || 'Medium').toLowerCase()}`} style={{ marginLeft: '0.5rem' }}>
                   {issue.priority || 'Medium'} priority
                 </span>

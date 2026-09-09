@@ -1,7 +1,15 @@
 {
-  "buildCommand": "cd FrontEnd && npm install && npm run build",
-  "outputDirectory": "FrontEnd/dist",
+  "services": {
+    "frontend": {
+      "root": "FrontEnd/"
+    },
+    "backend": {
+      "root": "Backend/",
+      "entrypoint": "main:app"
+    }
+  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/auth/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
   ]
 }

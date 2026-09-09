@@ -1,9 +1,10 @@
 import axios from 'axios'
 
-// In production, set VITE_API_URL to your deployed backend's URL.
-// Falls back to localhost for local development.
+// Locally, the backend runs on its own port. On Vercel, the frontend and
+// backend are deployed as services under the same domain, so requests to
+// /auth/* are routed straight to the backend — no absolute URL needed.
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:8000')
 });
 
 // Automatically attach the JWT (if we have one) to every request.

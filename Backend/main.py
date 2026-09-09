@@ -1,6 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import models
 
 from routes.route import router
 
@@ -9,7 +8,7 @@ app=FastAPI()
 app.include_router(router, prefix="/auth")
 
 origins = [
-    "http://localhost:5173", # Your React dev server
+    "http://localhost:5173", # Vite dev server
 ]
 
 app.add_middleware(

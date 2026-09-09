@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from models.issues import Issue, IssueUpdate
+from models.issues import Issue, IssueUpdate, CommentCreate
 import auth
 from config.database import collection_issues, collection_users
-from schema.schemas import list_serial
+from schema.schemas import individual_serial, list_serial
 from bson import ObjectId
-from datetime import date
+from datetime import date, datetime
 
 router = APIRouter()
 
@@ -50,28 +50,50 @@ async def get_current_user(token: auth.Annotated[str, auth.Depends(auth.oauth2_b
 
 ###ISSUE HANDLING###
 
+def _parse_object_id(id: str) -> ObjectId:
+    try:
+        return ObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid issue id")
+
+
 #Get Issues
 @router.get("/")
 async def get_issues(current_user: auth.Annotated[dict, Depends(get_current_user)]):
     issues = list_serial(collection_issues.find({"owner_id": current_user["id"]}))
     return issues
 
+# Get single issue
+@router.get("/{id}")
+async def get_issue(id: str, current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    object_id = _parse_object_id(id)
+    issue = collection_issues.find_one({"_id": object_id, "owner_id": current_user["id"]})
+    if not issue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    return individual_serial(issue)
+
 # Post Issue
 @router.post("/createIssue", status_code=status.HTTP_201_CREATED)
 async def post_issue(issue_Name: Issue, current_user: auth.Annotated[dict, Depends(get_current_user)]):
-    payload=dict(issue_Name)
+    payload = dict(issue_Name)
+    now = date.today().isoformat()
     payload["owner_id"] = current_user["id"]
+    payload["created_at"] = now
+    payload["updated_at"] = now
+    payload["comments"] = []
     result = collection_issues.insert_one(payload)
     if not result.acknowledged:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create issue")
-    return {"message": "Issue created"}
+    return {"message": "Issue created", "id": str(result.inserted_id)}
 
 # Patch Issue (update)
 @router.patch("/{id}")
 async def patch_issue(id: str, issue: IssueUpdate, current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    object_id = _parse_object_id(id)
     update_data = issue.model_dump(exclude_unset=True)
+    update_data["updated_at"] = date.today().isoformat()
     updated_issue = collection_issues.find_one_and_update(
-        {"_id": ObjectId(id)}, 
+        {"_id": object_id, "owner_id": current_user["id"]},
         {"$set": update_data},
         return_document=True
     )
@@ -82,10 +104,32 @@ async def patch_issue(id: str, issue: IssueUpdate, current_user: auth.Annotated[
 # Delete Issue
 @router.delete("/{id}")
 async def delete_issue(id: str, current_user: auth.Annotated[dict, Depends(get_current_user)]):
-    delete_result = collection_issues.delete_one({"_id": ObjectId(id)})
+    object_id = _parse_object_id(id)
+    delete_result = collection_issues.delete_one({"_id": object_id, "owner_id": current_user["id"]})
     if delete_result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found or already deleted")
     return {"message": "Issue deleted"}
+
+
+### COMMENTS ###
+
+# Add a comment to an issue
+@router.post("/{id}/comments", status_code=status.HTTP_201_CREATED)
+async def add_comment(id: str, comment: CommentCreate, current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    object_id = _parse_object_id(id)
+    new_comment = {
+        "body": comment.body,
+        "author": current_user["username"],
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    updated_issue = collection_issues.find_one_and_update(
+        {"_id": object_id, "owner_id": current_user["id"]},
+        {"$push": {"comments": new_comment}},
+        return_document=True
+    )
+    if not updated_issue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
+    return individual_serial(updated_issue)
 
 
 

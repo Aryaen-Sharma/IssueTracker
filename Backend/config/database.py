@@ -1,12 +1,52 @@
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from pymongo.errors import PyMongoError
+
 load_dotenv()
 
+ATLAS_URI = (
+    "mongodb+srv://"
+    + os.getenv("MONGO_USER", "")
+    + ":"
+    + os.getenv("MONGO_PASS", "")
+    + "@issuetrackerdb.oykuy3e.mongodb.net/?appName=IssueTrackerDB"
+)
+LOCAL_URI = os.getenv("MONGO_LOCAL_URI", "mongodb://localhost:27017")
 
-client = MongoClient("mongodb+srv://" + os.getenv("MONGO_USER") + ":" + os.getenv("MONGO_PASS") + "@issuetrackerdb.oykuy3e.mongodb.net/?appName=IssueTrackerDB")
+DB_NAME = "issue_tracker_db"
 
-db = client.issue_tracker_db
+
+def _connect() -> MongoClient:
+    """Try the Atlas (cloud) connection first; fall back to a local MongoDB
+    instance if Atlas is unreachable (e.g. DNS failure, no internet, bad
+    credentials). This keeps the app runnable for local development even
+    when the cloud database isn't reachable.
+    """
+    try:
+        client = MongoClient(ATLAS_URI, serverSelectionTimeoutMS=3000)
+        client.admin.command("ping")
+        print("[database] Connected to MongoDB Atlas.")
+        return client
+    except PyMongoError as exc:
+        print(f"[database] Atlas connection failed ({exc.__class__.__name__}); "
+              f"falling back to local MongoDB at {LOCAL_URI}.")
+
+    try:
+        client = MongoClient(LOCAL_URI, serverSelectionTimeoutMS=3000)
+        client.admin.command("ping")
+        print("[database] Connected to local MongoDB.")
+        return client
+    except PyMongoError as exc:
+        raise RuntimeError(
+            "Could not connect to MongoDB Atlas or a local MongoDB instance. "
+            "Start a local MongoDB server (e.g. `mongod` on port 27017) or fix "
+            "the Atlas connection string in .env."
+        ) from exc
+
+
+client = _connect()
+db = client[DB_NAME]
 
 collection_issues = db["Issues_List"]
 collection_users = db["Users"]

@@ -1,15 +1,10 @@
 {
-  "services": {
-    "frontend": {
-      "root": "FrontEnd/"
-    },
-    "backend": {
-      "root": "Backend/",
-      "entrypoint": "main:app"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd FrontEnd && npm install && npm run build",
+  "outputDirectory": "FrontEnd/dist",
+  "functions": {
+    "Backend/main.py": {
+      "maxDuration": 30
     }
-  },
-  "rewrites": [
-    { "source": "/auth/(.*)", "destination": { "service": "backend" } },
-    { "source": "/(.*)", "destination": { "service": "frontend" } }
-  ]
+  }
 }

@@ -18,19 +18,28 @@ DB_NAME = "issue_tracker_db"
 
 
 def _connect() -> MongoClient:
-    """Try the Atlas (cloud) connection first; fall back to a local MongoDB
+    """Connect to MongoDB Atlas. Locally, fall back to a local MongoDB
     instance if Atlas is unreachable (e.g. DNS failure, no internet, bad
-    credentials). This keeps the app runnable for local development even
-    when the cloud database isn't reachable.
+    credentials), so the app still runs for local development without a
+    cloud connection. In production (Vercel) there is no local Mongo to
+    fall back to, so a bad Atlas connection will raise clearly instead of
+    failing later with a confusing error.
     """
     try:
-        client = MongoClient(ATLAS_URI, serverSelectionTimeoutMS=3000)
+        client = MongoClient(ATLAS_URI, serverSelectionTimeoutMS=5000)
         client.admin.command("ping")
         print("[database] Connected to MongoDB Atlas.")
         return client
     except PyMongoError as exc:
-        print(f"[database] Atlas connection failed ({exc.__class__.__name__}); "
-              f"falling back to local MongoDB at {LOCAL_URI}.")
+        print(f"[database] Atlas connection failed ({exc.__class__.__name__}: {exc}); "
+              f"trying local fallback at {LOCAL_URI}.")
+
+    if os.getenv("VERCEL"):
+        raise RuntimeError(
+            "Could not connect to MongoDB Atlas. Check MONGO_USER/MONGO_PASS "
+            "in the Vercel project's environment variables (the password may "
+            "be stale or the Atlas IP access list may be blocking Vercel)."
+        )
 
     try:
         client = MongoClient(LOCAL_URI, serverSelectionTimeoutMS=3000)

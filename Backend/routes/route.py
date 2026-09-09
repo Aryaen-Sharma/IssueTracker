@@ -19,8 +19,8 @@ def authenticate_user(username: str, password: str):
         return False
     return user
 
-def create_access_token(username: str, id:int, expire: auth.timedelta):
-    encode = {'sub': username, 'id': id}
+def create_access_token(username: str, id: int, is_admin: bool, expire: auth.timedelta):
+    encode = {'sub': username, 'id': id, 'is_admin': is_admin}
     expires = auth.datetime.utcnow() + expire
     encode.update({'exp': expires})
     return auth.jwt.encode(encode, auth.SECRET_KEY, algorithm=auth.ALGORITHM)
@@ -37,8 +37,8 @@ async def get_current_user(token: auth.Annotated[str, auth.Depends(auth.oauth2_b
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate user."
             )
-            
-        return {"username": username, "id": user_id}
+
+        return {"username": username, "id": user_id, "is_admin": payload.get("is_admin", False)}
 
     except auth.JWTError:
         raise HTTPException(
@@ -141,7 +141,17 @@ async def patch_issue(id: str, issue: IssueUpdate, current_user: auth.Annotated[
 @router.delete("/{id}")
 async def delete_issue(id: str, current_user: auth.Annotated[dict, Depends(get_current_user)]):
     object_id = _parse_object_id(id)
-    delete_result = collection_issues.delete_one({"_id": object_id, "owner_id": current_user["id"]})
+    issue = collection_issues.find_one({"_id": object_id, "owner_id": current_user["id"]})
+    if not issue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found or already deleted")
+
+    if issue.get("is_protected") and not current_user.get("is_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This issue is protected and can only be deleted by an admin.",
+        )
+
+    delete_result = collection_issues.delete_one({"_id": object_id})
     if delete_result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found or already deleted")
     return {"message": "Issue deleted"}
@@ -169,18 +179,85 @@ async def add_comment(id: str, comment: CommentCreate, current_user: auth.Annota
 
 
 
+### SAMPLE DATA ###
+# Every new account gets a starter set of issues so the app isn't an empty
+# screen on first login. A couple are marked "protected" (high-sensitivity,
+# e.g. security/production items) and can only be deleted by an admin.
+def _sample_issues(owner_id: str) -> list[dict]:
+    today = date.today().isoformat()
+    starters = [
+        {
+            "title": "Fix login page overflow on mobile",
+            "description": "The login form clips off-screen on narrow viewports (< 375px).",
+            "status": "Open",
+            "priority": "Medium",
+            "labels": ["frontend", "css"],
+            "due_date": None,
+            "is_protected": False,
+        },
+        {
+            "title": "Add dark mode toggle",
+            "description": "Users want a persistent light/dark theme switch.",
+            "status": "Closed",
+            "priority": "Low",
+            "labels": ["frontend", "enhancement"],
+            "due_date": None,
+            "is_protected": False,
+        },
+        {
+            "title": "Rotate database credentials",
+            "description": "Production DB password hasn't been rotated in over 90 days. Security policy requires quarterly rotation.",
+            "status": "Open",
+            "priority": "High",
+            "labels": ["security", "backend"],
+            "due_date": None,
+            "is_protected": True,
+        },
+        {
+            "title": "Investigate slow query on issues list",
+            "description": "The issues endpoint slows down noticeably past a few thousand documents; likely missing an index on owner_id.",
+            "status": "In Progress",
+            "priority": "High",
+            "labels": ["backend", "performance"],
+            "due_date": None,
+            "is_protected": False,
+        },
+        {
+            "title": "Audit admin-only delete permissions",
+            "description": "Confirm that protected issues can only be removed by admin accounts, and that the check happens server-side, not just in the UI.",
+            "status": "Open",
+            "priority": "High",
+            "labels": ["security"],
+            "due_date": None,
+            "is_protected": True,
+        },
+    ]
+
+    issues = []
+    for starter in starters:
+        issue = dict(starter)
+        issue["owner_id"] = owner_id
+        issue["created_at"] = today
+        issue["updated_at"] = today
+        issue["comments"] = []
+        issues.append(issue)
+    return issues
+
+
 ### AUTH ###
 @router.post("/user", status_code=status.HTTP_201_CREATED)
 async def create_user(create_user_request: auth.CreateUserRequest):
     if collection_users.find_one({"username": create_user_request.username}):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
-    
+
     new_user = {
         "username": create_user_request.username,
-        "hashed_pass": auth.bcrypt_context.hash(create_user_request.password)
+        "hashed_pass": auth.bcrypt_context.hash(create_user_request.password),
+        "is_admin": False,
     }
-    collection_users.insert_one(new_user)
-    return {"message": "User created successfully"            }
+    result = collection_users.insert_one(new_user)
+    collection_issues.insert_many(_sample_issues(str(result.inserted_id)))
+    return {"message": "User created successfully"}
 
 
 
@@ -189,5 +266,24 @@ async def login_for_token(form_data: auth.Annotated[auth.OAuth2PasswordRequestFo
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
-    token= create_access_token(user["username"], str(user.get("_id")), auth.timedelta(minutes=20))
+    token = create_access_token(
+        user["username"], str(user.get("_id")), user.get("is_admin", False), auth.timedelta(minutes=20)
+    )
     return {'access_token': token, 'token_type': 'bearer', 'user_id': str(user.get("_id"))}
+
+
+# Demo-only: lets the logged-in user flip their own admin flag so visitors
+# can try out the admin-only delete permission without a separate admin
+# account. A real app would never let a user grant themselves privileges —
+# this exists purely to demo the server-side authorization check below.
+@router.post("/toggle-admin-demo")
+async def toggle_admin_demo(current_user: auth.Annotated[dict, Depends(get_current_user)]):
+    user = collection_users.find_one({"_id": ObjectId(current_user["id"])})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    new_is_admin = not user.get("is_admin", False)
+    collection_users.update_one({"_id": user["_id"]}, {"$set": {"is_admin": new_is_admin}})
+
+    token = create_access_token(user["username"], str(user["_id"]), new_is_admin, auth.timedelta(minutes=20))
+    return {"access_token": token, "token_type": "bearer", "is_admin": new_is_admin}

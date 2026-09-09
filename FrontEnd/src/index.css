@@ -139,6 +139,16 @@
   color: var(--danger-hover);
 }
 
+.protected-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background-color: rgba(224, 166, 62, 0.15);
+  color: var(--warning);
+}
+
 /* ---------- Pagination ---------- */
 
 .pagination {

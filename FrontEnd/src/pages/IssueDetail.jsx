@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import TopBar from '../components/TopBar'
+import { useAuth } from '../context/useAuth'
 import { useToast } from '../context/useToast'
 
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Closed']
@@ -13,6 +14,7 @@ const isOverdue = (issue) => issue.due_date && issue.status !== 'Closed' && issu
 const IssueDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const { showToast } = useToast()
 
   const [issue, setIssue] = useState(null)
@@ -97,7 +99,11 @@ const IssueDetail = () => {
       navigate('/')
     } catch (error) {
       console.error('Error deleting issue:', error.response?.data || error.message)
-      showToast('Could not delete issue', 'error')
+      if (error.response?.status === 403) {
+        showToast(error.response.data.detail || 'This issue is protected.', 'error')
+      } else {
+        showToast('Could not delete issue', 'error')
+      }
     }
   }
 
@@ -198,6 +204,7 @@ const IssueDetail = () => {
               <div>
                 <h2 style={{ marginBottom: '0.35rem' }}>{issue.title}</h2>
                 <span className={`badge-select-static ${statusClass(issue.status)}`}>{issue.status}</span>
+                {issue.is_protected && <span className="protected-tag" style={{ marginLeft: '0.5rem' }}>🔒 Protected</span>}
                 <span className={`priority-tag priority-${(issue.priority || 'Medium').toLowerCase()}`} style={{ marginLeft: '0.5rem' }}>
                   {issue.priority || 'Medium'} priority
                 </span>
@@ -216,7 +223,14 @@ const IssueDetail = () => {
               </div>
               <div className="issue-actions">
                 <button className="btn btn-outline btn-sm" onClick={startEditing}>Edit</button>
-                <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete</button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={handleDelete}
+                  disabled={issue.is_protected && !isAdmin}
+                  title={issue.is_protected && !isAdmin ? 'Protected — only an admin can delete this' : undefined}
+                >
+                  Delete
+                </button>
               </div>
             </div>
 

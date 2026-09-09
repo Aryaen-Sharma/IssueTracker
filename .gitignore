@@ -16,6 +16,13 @@ dist
 dist-ssr
 *.local
 
+# Test artifacts
+.pytest_cache
+test-results
+playwright-report
+blob-report
+playwright/.cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

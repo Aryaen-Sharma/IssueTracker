@@ -4,7 +4,7 @@ import auth
 from config.database import collection_issues, collection_users
 from schema.schemas import individual_serial, list_serial
 from bson import ObjectId
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 router = APIRouter()
 
@@ -66,7 +66,11 @@ async def get_issues(
 ):
     query = {"owner_id": current_user["id"]}
     total = collection_issues.count_documents(query)
-    cursor = collection_issues.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    # Sort by _id as a tiebreaker so pagination stays stable even when
+    # several issues share the same created_at date (e.g. all seeded on
+    # signup) — otherwise MongoDB's tie order isn't guaranteed and the
+    # same issue could show up on more than one page.
+    cursor = collection_issues.find(query).sort([("created_at", -1), ("_id", -1)]).skip(skip).limit(limit)
     return {
         "items": list_serial(cursor),
         "total": total,
@@ -166,7 +170,7 @@ async def add_comment(id: str, comment: CommentCreate, current_user: auth.Annota
     new_comment = {
         "body": comment.body,
         "author": current_user["username"],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     updated_issue = collection_issues.find_one_and_update(
         {"_id": object_id, "owner_id": current_user["id"]},

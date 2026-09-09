@@ -14,7 +14,9 @@ ATLAS_URI = (
 )
 LOCAL_URI = os.getenv("MONGO_LOCAL_URI", "mongodb://localhost:27017")
 
-DB_NAME = "issue_tracker_db"
+# Tests set MONGO_DB_NAME to a separate database (e.g. issue_tracker_test_db)
+# so automated runs never touch real data.
+DB_NAME = os.getenv("MONGO_DB_NAME", "issue_tracker_db")
 
 
 def _connect() -> MongoClient:

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import api from '../api'
 import TopBar from '../components/TopBar'
 
@@ -81,12 +81,21 @@ const Stats = () => {
                 <h2>By Status</h2>
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
-                    <Pie data={statusData} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
+                    <Pie
+                      data={statusData}
+                      dataKey="count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="45%"
+                      outerRadius={80}
+                      label={({ name, count }) => `${name}: ${count}`}
+                    >
                       {statusData.map((entry) => (
                         <Cell key={entry.name} fill={STATUS_COLORS[entry.name]} />
                       ))}
                     </Pie>
                     <Tooltip />
+                    <Legend verticalAlign="bottom" height={24} />
                   </PieChart>
                 </ResponsiveContainer>
               </section>

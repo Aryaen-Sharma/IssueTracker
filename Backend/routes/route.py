@@ -181,8 +181,9 @@ async def add_comment(id: str, comment: CommentCreate, current_user: auth.Annota
 
 ### SAMPLE DATA ###
 # Every new account gets a starter set of issues so the app isn't an empty
-# screen on first login. A couple are marked "protected" (high-sensitivity,
-# e.g. security/production items) and can only be deleted by an admin.
+# screen on first login. A few are marked "protected" (critical/high-
+# sensitivity items like security or production issues) and can only be
+# deleted by an admin — everything else behaves like a normal issue.
 def _sample_issues(owner_id: str) -> list[dict]:
     today = date.today().isoformat()
     starters = [
@@ -205,11 +206,11 @@ def _sample_issues(owner_id: str) -> list[dict]:
             "is_protected": False,
         },
         {
-            "title": "Rotate database credentials",
+            "title": "Rotate production database credentials",
             "description": "Production DB password hasn't been rotated in over 90 days. Security policy requires quarterly rotation.",
             "status": "Open",
             "priority": "High",
-            "labels": ["security", "backend"],
+            "labels": ["security", "backend", "critical"],
             "due_date": None,
             "is_protected": True,
         },
@@ -227,9 +228,54 @@ def _sample_issues(owner_id: str) -> list[dict]:
             "description": "Confirm that protected issues can only be removed by admin accounts, and that the check happens server-side, not just in the UI.",
             "status": "Open",
             "priority": "High",
-            "labels": ["security"],
+            "labels": ["security", "critical"],
             "due_date": None,
             "is_protected": True,
+        },
+        {
+            "title": "Write unit tests for comment endpoint",
+            "description": "The /comments route has no test coverage yet. Add basic create/list cases.",
+            "status": "Open",
+            "priority": "Medium",
+            "labels": ["backend", "testing"],
+            "due_date": None,
+            "is_protected": False,
+        },
+        {
+            "title": "Improve empty state on dashboard",
+            "description": "First-time users see a plain message with no visual cue. Consider a small illustration or CTA.",
+            "status": "Closed",
+            "priority": "Low",
+            "labels": ["frontend", "design"],
+            "due_date": None,
+            "is_protected": False,
+        },
+        {
+            "title": "Set up automated database backups",
+            "description": "There's currently no scheduled backup for the production Atlas cluster. A restore-from-backup drill should follow once this is set up.",
+            "status": "Open",
+            "priority": "High",
+            "labels": ["infra", "critical"],
+            "due_date": None,
+            "is_protected": True,
+        },
+        {
+            "title": "Add loading skeleton to issue list",
+            "description": "Right now the list just shows a plain 'Loading…' message while fetching.",
+            "status": "Open",
+            "priority": "Low",
+            "labels": ["frontend"],
+            "due_date": None,
+            "is_protected": False,
+        },
+        {
+            "title": "Support filtering issues by due date range",
+            "description": "Add a 'this week' / 'overdue' quick filter on the dashboard.",
+            "status": "Open",
+            "priority": "Medium",
+            "labels": ["frontend", "enhancement"],
+            "due_date": None,
+            "is_protected": False,
         },
     ]
 
@@ -266,10 +312,18 @@ async def login_for_token(form_data: auth.Annotated[auth.OAuth2PasswordRequestFo
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+
+    # Backfill: accounts created before sample data existed would otherwise
+    # never get a starter set. If this user has no issues at all, seed them
+    # now so the dashboard isn't empty.
+    owner_id = str(user["_id"])
+    if collection_issues.count_documents({"owner_id": owner_id}) == 0:
+        collection_issues.insert_many(_sample_issues(owner_id))
+
     token = create_access_token(
-        user["username"], str(user.get("_id")), user.get("is_admin", False), auth.timedelta(minutes=20)
+        user["username"], owner_id, user.get("is_admin", False), auth.timedelta(minutes=20)
     )
-    return {'access_token': token, 'token_type': 'bearer', 'user_id': str(user.get("_id"))}
+    return {'access_token': token, 'token_type': 'bearer', 'user_id': owner_id}
 
 
 # Demo-only: lets the logged-in user flip their own admin flag so visitors
